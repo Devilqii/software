@@ -1,236 +1,296 @@
-#include <iostream>
-#include <malloc.h>
+#include <SDKDDKVer.h>
 #include <stdio.h>
-#define MAX_VERTEX_NUM 20
-#define MAX_ARCNUM_NUM 100
-#define ERROR 0
-#define OK 1
-//栈里元素的个数
-#define SIZE 20
+#include <tchar.h>
+#include <iostream>
+#include<ctime>
 using namespace std;
-
-//**********创建邻接表作为图的存储结构**********
-typedef struct ArcNode {  //边的结点结构
-    int adjvex; //该边所指向的顶点位置
-    int weight; //边上的权值
-    struct  ArcNode* nextarc;//指向下一条弧的指针
-}ArcNode;
-
-typedef struct {  //顶点的结点结构
-    char vertex;    //顶点信息
-    ArcNode* firstarc; //指向第一条依附该顶点的边
-}VNode, AdjList[MAX_VERTEX_NUM];
-
-typedef struct {  //图的结构定义（邻接表）
-    AdjList vertices;
-    int vexnum, arcnum;  //图的当前顶点数和边数
-}ALGraph;
-
-void CreateGraph(ALGraph* G)
+class Solve
 {
-    int k, w, v, Kg; ArcNode* s;
-    cout << "请输入这个项目中AOE-网的结点数和活动数(用空格隔开)：";
-    cin >> G->vexnum >> G->arcnum;
-    for (int i = 0; i < 20; i++)
-    {
-        G->vertices[i].firstarc = NULL;
-    }
-    for (int i = 0; i < G->vexnum; i++)
-    {
-        cout << "输入第" << i + 1 << "个结点名称：";
-        cin >> G->vertices[i].vertex;
-        G->vertices[i].firstarc = NULL;
-    }
-    //-------前插法
-    for (k = 0; k < G->arcnum; k++)
-    {
-        cout << "输入第" << k + 1 << "个活动的两个顶点(用空格分隔)：";
-        cin >> w >> v;
-        w -= 1; v -= 1;
-        cout << "该活动的权值：";
-        cin >> Kg;
-        s = (ArcNode*)malloc(sizeof(ArcNode));
-        s->adjvex = v; s->weight = Kg;
-        s->nextarc = G->vertices[w].firstarc;
-        G->vertices[w].firstarc = s;
-    }
-}
-
-void DispGraph(ALGraph* G)
-{
-    cout << "使用邻接表作为图的存储结构：" << endl;
-    ArcNode* p;
-    for (int i = 0; i < G->arcnum; i++)
-    {
-        cout << G->vertices[i].vertex << "  -";
-        p = G->vertices[i].firstarc;
-        while (p != NULL)
-        {
-            cout << p->weight << "->  ";
-            cout << p->adjvex + 1 << "  -";
-            p = p->nextarc;
-        }
-        cout << "->  ^" << endl;
-    }
-}
-
-
-//---------(数组)栈的基本操作------------------
-struct SqStack {//(数组)栈的声明
-    int sta[SIZE];
-    int top;
+private:
+	char* cst;
+	float* fst;
+	int cp, fp;
+	static int table[7][7];  //算数优先符号表
+protected:
+	int compare(char a, char b);
+	/* 在这里比较运算符的优先次序如a 为新输入操作符， b 为后输入操作符, 如果 a > b
+	 返回 1， 如果 a = b 返回0; 如果 a < b, 返回 1 */
+	void computer(char c);
+	/* 从操作数栈里取出两数进行 c 运算，并把结果入栈*/
+	int getodr(char c);  //获取操作符在table表中的下标;
+public:
+	Solve();
+	void isolve();
+	~Solve();
+	void getNum(float c);     //获取相应长度
+	void getCh(char c);		//获取相应字符压入栈
+	float getRes();
 };
-void InitStack(SqStack* s)//栈的初始化
+int Solve::table[7][7] = {// +， -， *， /， （， ）， #，
+	{ -1, -1, -1, -1, 1, 0, 1 },
+	{ -1, -1, -1, -1, 1, 0, 1 },
+	{ 1,  1, -1, -1, 1, 0, 1 },
+	{ 1,  1, -1, -1, 1, 0, 1 },
+	{ 1,  1, 1,  1, 1, 0, 1 },
+	{ -1, -1, -1, -1, 0, 0 ,0 },
+	{-1, -1, -1, -1, 0, 0, 0}
+};
+Solve::Solve()              // 完成初始化操作符操作数堆栈置0
 {
-    for (int k = 0; k < SIZE; k++)
-        s->sta[k] = -1;
-    s->top = -1;  // 0
+	cst = new char[30];
+	fst = new float[30];
 }
-int InStack(SqStack* s, int data)//压栈
+Solve::~Solve() {}
+void Solve::isolve()
 {
-    if (s->top == SIZE - 1)
-    {
-        cout << "the Stack is full!" << endl;
-        return 1;
-    }
-    (s->top)++;
-    s->sta[s->top] = data;
-    return 0;
+	cp = 0;
+	fp = 0;
 }
-int OutStack(SqStack* s)//出栈
+void Solve::getNum(float c)
 {
-    int tmp;
-    if (s->top < 0)
-    {
-        cout << "the Stack is empty!" << endl;
-        return -1;
-    }
-    tmp = s->sta[s->top];
-    (s->top)--;
-    return tmp;
+	fst[fp++] = c;
 }
-void destory(SqStack* s)//栈的删除
+float Solve::getRes()
 {
-    s->top = -1;
-    for (int k = 0; k < SIZE; k++)
-        s->sta[k] = 0;
+	return  fst[--fp];
 }
-
-//----------拓扑排序验证有向无环图----------------
-int ve[MAX_ARCNUM_NUM]; //最早发生时间
-int vl[MAX_ARCNUM_NUM]; //最迟发生时间
-
-/*--各顶点入度---*/
-int indegree[MAX_VERTEX_NUM];
-int test1[MAX_VERTEX_NUM];
-void FindInDegree(ALGraph* G)
+void Solve::getCh(char c)			// c 为新得到的字符;
 {
-    for (int k = 0; k < G->vexnum; k++)
-        indegree[k] = test1[k] = 0;
-    ArcNode* p;
-    for (int i = 0; i < G->arcnum; i++)
-    {
-        p = G->vertices[i].firstarc;
-        while (p != NULL)
-        {
-            indegree[p->adjvex]++;
-            p = p->nextarc;
-        }
-    }
+	if (cp == 0 && c == '#')		//接受第一个字符 '#'
+	{
+		cst[cp++] = c;
+	}
+	else							//若输入的是加减乘除'#'；
+	{
+		char u = cst[cp - 1];		// u 栈顶字符
+		if (compare(c, u) == 1)		//新输入的优先级大于栈顶
+		{
+			cst[cp++] = c;
+		}
+		else if (compare(c, u) == 0) // 新输入优先级小于栈顶
+		{
+			if (u == '(' && c == ')' || u == '#' && c == '#')
+			{
+				cp--; //将左括号移出去;
+			}
+			else
+			{
+				printf("priority 0 error");
+			}
+		}
+		else if (compare(c, u) == -1) //新输入优先级等于小于栈顶
+		{
+			do
+			{
+				cp--;
+				computer(u);			//拿出栈顶符号去计算
+				u = cst[cp - 1];	//新的栈顶符号
+			} while (compare(c, u) == -1);
+			//直到栈顶符号优先级不高于 最新输入的操作符优先级，跳出循环
+			if (u == '(' && c == ')' || u == '#' && c == '#') //如果优先级相等，就拿出去;
+			{
+				cp--; //将左括号移出去;
+			}
+			else					 //如果新输入操作符优先级高，则放入;
+			{
+				cst[cp++] = c;
+			}
+		}
+		else
+		{
+			printf("error\n");
+		}
+	}
 }
-int TopologicalSort(ALGraph* G, SqStack* T)
+int Solve::compare(char a, char b)
 {
-    FindInDegree(G);
-    SqStack* S; S = (SqStack*)malloc(sizeof(SqStack));
-    InitStack(S);
-    InitStack(T); int Cout = 0;
-    for (int m = 0; m < G->arcnum; m++)
-        ve[m] = 0;
-    for (int i = 0; i < G->vexnum; i++)
-        if (indegree[i] == 0)
-        {
-            InStack(S, i);
-        }
-    int i, k;
-    ArcNode* p;
-    while (S->top >= 0)    //栈不空
-    {
-        i = OutStack(S); InStack(T, i);/*test[i]=1;*/ Cout++;
-        for (p = G->vertices[i].firstarc; p != NULL; p = p->nextarc)
-        {
-            k = p->adjvex;
-            indegree[k]--;  //i号顶点每一个邻接点入度-1
-            if (indegree[k] == 0)
-                InStack(S, k);
-            if (ve[i] + p->weight > ve[k]) ve[k] = ve[i] + p->weight;
-        }//for
-    }//while
-    if (Cout < G->vexnum)
-        return ERROR; cout << endl;
-    return 1;
+	return table[getodr(a)][getodr(b)];
 }
-
-//----------关键路径----------
-int CriticalPath(ALGraph* G, SqStack* T)
+void Solve::computer(char c)
 {
-    if (TopologicalSort(G, T) == 0) {
-        cout << endl << "！！输入的AOE-网中存在环结构！！" << endl;
-        cout << "--****************************************--" << endl;
-        return ERROR;//0
-    }
-    for (int n = 0; n < G->vexnum; n++)
-        vl[n] = 1000; vl[G->vexnum - 1] = ve[G->vexnum - 1];
-    ArcNode* p; int j, k, dut, ee, el;
-    cout << endl << "------------------------------------------------------------------------------------";
-    int b = 0, xx = T->top; cout << endl << "工序间的先后关系（拓扑序列）：" << endl;
-    while (b <= xx)
-    {
-        cout << T->sta[b] + 1 << " "; b++;
-    }
-    cout << endl << "------------------------------------------------------------------------------------" << endl;
-    while (T->top >= 0)
-        for (j = OutStack(T), p = G->vertices[j].firstarc; p != NULL; p = p->nextarc)
-        {
-            k = p->adjvex; dut = p->weight;
-            if (vl[k] - dut < vl[j]) vl[j] = vl[k] - dut;
-        }//for
-    printf("起点 终点 最早开始时间 最迟开始时间 权值   备注\n");
-    int sum = 0, c = 0;
-    for (j = 0; j < G->vexnum; ++j)
-        for (p = G->vertices[j].firstarc; p != NULL; p = p->nextarc) {
-            k = p->adjvex; dut = p->weight;
-            ee = ve[j]; el = vl[k] - dut;
-            printf("%2d %4d %8d %12d %8d     ", j + 1, k + 1, ee, el, dut);
-            if (ee == el)
-            {
-                cout << "关键活动：";
-                cout << "<" << j + 1 << " ," << k + 1 << " >  该活动需要时间=" << p->weight;
-
-                if (test1[j] == 0 && c == 0 && test1[k] == 0)
-                {
-                    sum += dut; c++; cout << " *计入总时间";
-                    test1[j] = 2; test1[k] = 1;
-                }
-                if (test1[j] == 1)
-                {
-                    sum += dut; cout << " *计入总时间";
-                    test1[j] = 2; test1[k] = 1;
-                }
-            }
-            cout << endl;
-        }
-    cout << "----------------------------------------------" << endl;
-    cout << "项目的最早完成时间为：" << sum << "（单位时间）" << endl;
-    cout << "----------------------------------------------" << endl << endl;
-    return 0;
+	float a, b;
+	float res;
+	b = fst[--fp];
+	a = fst[--fp];
+	if (c == '*')
+	{
+		res = a * b;
+	}
+	else if (c == '/') //除数为0是不被允许的,这里当除数为时当1处理，防止程序崩溃;
+	{
+		if (b == 0)
+		{
+			res = a;
+		}
+		else
+		{
+			res = 1.0 * a / b;
+		}
+	}
+	else if (c == '+')
+	{
+		res = a + b;
+	}
+	else if (c == '-')
+	{
+		res = a - b;
+	}
+	else
+	{
+		printf("computer error having excepted opr");
+	}
+	fst[fp++] = res; //将计算成功的结果返回堆栈；
+}
+int Solve::getodr(char c)
+{
+	if (c == '+') return 0;
+	if (c == '-') return 1;
+	if (c == '*') return 2;
+	if (c == '/') return 3;
+	if (c == '(') return 4;
+	if (c == ')') return 5;
+	if (c == '#') return 6;
 }
 int main()
 {
-    ALGraph* G = new ALGraph;
-    cout << "***********估算工程领域中项目的最早完成时间***********" << endl << endl;
-    CreateGraph(G);
-    SqStack* T;
-    T = (SqStack*)malloc(sizeof(SqStack));
-    CriticalPath(G, T);
-    return 0;
+	srand((unsigned)time(NULL));
+	int num, max = 0;
+	char op[20] = { '\0' };
+	bool cld1, cld2; // cld1为1 表示可能含有括号， 为0表示不含括号， cld2 为1表示含有小数为2表示不含有小数;
+	float  resArray[100] = { 0 };
+	int respos = 0;
+	// 输入操作
+
+	printf("请输入生成题目的数量:\n");
+	while (true)
+	{
+		cin >> num;
+		if (num > 0) break;
+		cout << "输入有误， 请重新输入题目数量:\n";
+	}
+	printf("========================================================\n");
+	printf("请选择运算符， 例如：加减乘除  +  -  *  /  :\n ");
+	cin >> op;
+	printf("========================================================\n");
+	printf("请输入数值的最大值:\n");
+	while (true)
+	{
+		cin >> max;
+		if (max > 0) break;
+		cout << "输入有误， 请重新输入最大值:\n";
+	}
+	printf("========================================================\n");
+	printf("请选择是否有括号 1or0（1代表有，0代表无）:\n");
+	cin >> cld1;
+	printf("========================================================\n");
+	printf("请选择是否有小数 1or0（1代表有，0代表无）:\n");
+	cin >> cld2;
+
+	// **********************************************--------***********//
+	 //生成操作
+	int opnum = 0;    //统计op 并处理
+	while (true)
+	{
+		if (op[opnum] != '\0')
+		{
+			opnum++;
+		}
+		else
+		{
+			break;
+		}
+	}  // 此时  opnum 记录着 op操作符的数量；
+	/*****************************************************************/
+
+	// 考虑到实际中不太会有 过于长的多项式， 这里 设置一个随机数把含有的符号数限制到7个以内；
+	// opmax 为 + - * / 的最大个数， 限制了多项式的长度;
+	int pos = 0;
+	int opmax = 0;
+	int kuohao = 0;
+	int order = 1; //题目序号
+	int flag = 0; // 排除一个操作数左右两边括号的情况:  (a) + b 
+	Solve s1;  //创建计算器， 用于实时计算字符串的值；
+	while (num--)
+	{
+		s1.isolve(); //清空计算器; 
+		s1.getCh('#'); // 放入'#' 准备接受算式开始计算;
+		float factor = 0;
+		cout << order++ << ".     ";
+		pos = 0;
+		opmax = rand() % 6 + 1;
+		kuohao = 0;
+		while (opmax--)			//开始生成多项式
+		{
+			char vv = '\0';
+			bool lf = false;	// 用于表示此次是否生成了左括号
+			if (cld1 == 1 && rand() % 8 > 5) // 1/8 的概率出现括号;
+			{
+				flag = 0;
+				cout << '(';
+				kuohao++;
+				lf = true;
+			}
+			if (lf)
+			{
+				s1.getCh('(');
+			}
+			factor = rand() % (max - 1) + 1 + ((rand() % 100) * 1.0 / 100) * cld2;
+			cout << factor;
+			//生成操作数 factor;
+			s1.getNum(factor); //操作数放入计算器
+			bool rf = false;  //用于表示是否生成了右括号;
+			if (cld1 == 1 && kuohao > 0 && flag != 0)
+			{
+				if (rand() % 4 > 2)
+				{
+					cout << ')';
+					kuohao--;
+					rf = true;
+				}
+			}
+			if (rf)
+			{
+				s1.getCh(')');
+			}
+			//生成操作符 
+			pos = rand() % opnum;
+			cout << op[pos];
+
+			//将操作符放入计算器;
+			s1.getCh(op[pos]);
+
+			flag++;
+		}
+		factor = rand() % (max - 1) + 1 + ((rand() % 100) * 1.0 / 100) * cld2;
+		cout << factor;
+		//将最后一个操作数放入计算器
+		s1.getNum(factor);
+		while (kuohao--)
+		{
+			cout << ')';
+			s1.getCh(')');
+		}
+		//将结尾符号'#'放入计算器;
+		s1.getCh('#');
+		printf("=?\n");
+		//将最终的结果放入结果数组
+		resArray[respos++] = s1.getRes();
+	}
+	printf("========================================================\n");
+	printf("||****************************************************||\n");
+	printf("计算结果如下：\n");
+	// 输出答案 *************************************************//:
+	for (int i = 0; i < respos; i++)
+	{
+		cout << i + 1 << ". " << resArray[i] << endl;
+		if (i + 1 % 10 == 0)
+		{
+			cout << endl;
+		}
+	}
+	printf("||****************************************************||\n");
+	printf("========================================================\n");
+	//******************************************************//
+
+	return 0;
 }
